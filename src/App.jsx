@@ -75,7 +75,7 @@ export default function App(){
       <main className="relative flex-1">
         <section className="relative min-h-screen w-full overflow-hidden">
           <div className="absolute inset-0">
-            <div className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url(${heroImage})`, filter: 'brightness(1.28) saturate(1.2)' }} />
+            <div className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url(${heroImage})`, filter: 'brightness(1.29) saturate(1)' }} />
             <div className="absolute inset-0 bg-gradient-to-b from-white/45 via-white/55 to-[#dceeff]" />
           </div>
           <div className="container-center relative z-10 flex min-h-screen items-center py-20">
@@ -87,7 +87,7 @@ export default function App(){
             >
               <p className="mb-4 text-xs uppercase tracking-[0.35em] text-soft">Workspace: Blue and Grey</p>
               <h2 className="text-5xl font-light leading-tight text-[#1f3b66] sm:text-6xl lg:text-7xl font-cursive">
-                Rameesa is a quiet gallery for poems.
+                Blue and Grey is a quiet gallery for poems.
               </h2>
               <p className="mt-6 max-w-2xl text-base leading-8 text-soft sm:text-lg">
                 A gentle space for visual poems, where each piece opens like an art print, reveals its hidden line on long press, and feels more like moving through a curated exhibition than scrolling a feed.
@@ -168,7 +168,7 @@ export default function App(){
       <footer className="mt-auto border-t border-sky-200/70 py-6 text-xs uppercase tracking-[0.28em] text-soft">
         <div className="container-center flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <span>© {new Date().getFullYear()} Rameesa</span>
-          <a href="https://instagram.com/blue.and.grey" target="_blank" rel="noreferrer" className="text-[#1f3b66]">@__blue.and.grey__</a>
+          <a href="https://instagram.com/__blue.and.grey__" target="_blank" rel="noreferrer" className="text-[#1f3b66]">@__blue.and.grey__</a>
         </div>
       </footer>
 

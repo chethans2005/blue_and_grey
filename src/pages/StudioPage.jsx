@@ -1,64 +1,20 @@
-import React, {useState, useEffect} from 'react'
-import { auth, signInWithGoogle, storage, db, isFirebaseConfigured } from '../firebase'
-import { onAuthStateChanged, signOut } from 'firebase/auth'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import React, {useState} from 'react'
+import { storage, db, isFirebaseConfigured } from '../firebase'
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 
-const ADMIN_EMAILS = ['chetansoyal@gmail.com']
+const STUDIO_PASSCODE = import.meta.env.VITE_STUDIO_PASSCODE || ''
 
 export default function StudioPage(){
-  const [user, setUser] = useState(auth?.currentUser ?? null)
   const [files, setFiles] = useState([])
   const [caption, setCaption] = useState('')
   const [hiddenMessage, setHiddenMessage] = useState('')
   const [uploading, setUploading] = useState(false)
-  const [adminReady, setAdminReady] = useState(false)
-  const [authChecked, setAuthChecked] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [passcode, setPasscode] = useState('')
+  const [unlocked, setUnlocked] = useState(false)
   const [authError, setAuthError] = useState('')
-  const [signingIn, setSigningIn] = useState(false)
-
-  useEffect(()=>{
-    if(!auth) return
-    const unsub = onAuthStateChanged(auth, (u)=>{
-      setUser(u)
-      const isAdmin = ADMIN_EMAILS.includes(u?.email || '')
-      setAdminReady(isAdmin)
-      setAuthChecked(true)
-      if(u && !isAdmin){
-        setAuthError('This account is not allowed to access Studio.')
-        signOut(auth)
-      } else {
-        setAuthError('')
-      }
-    })
-    return ()=>unsub()
-  },[])
-
-  useEffect(()=>{
-    if(!isFirebaseConfigured || !auth) return
-    if(!authChecked) return
-    if(user || signingIn) return
-    setSigningIn(true)
-    signInWithGoogle()
-      .catch((err)=>{
-        setAuthError(err?.message || 'Sign-in required to access Studio.')
-      })
-      .finally(()=>setSigningIn(false))
-  },[authChecked, user, signingIn])
-
-  async function ensureSign(){
-    if(!isFirebaseConfigured || !auth) return false
-    if(!auth.currentUser) await signInWithGoogle()
-    setUser(auth.currentUser)
-    const isAdmin = ADMIN_EMAILS.includes(auth.currentUser?.email)
-    setAdminReady(isAdmin)
-    if(!isAdmin){
-      setAuthError('This account is not allowed to access Studio.')
-      await signOut(auth)
-      return false
-    }
-    return true
-  }
+  const [uploadError, setUploadError] = useState('')
 
   function onSelect(e){
     const picked = Array.from(e.target.files).map((file, idx)=>({
@@ -91,24 +47,42 @@ export default function StudioPage(){
       alert('Connect Firebase before using Studio')
       return
     }
-    if(!(await ensureSign())) return
+    if(!unlocked) return
+    if(files.length === 0) {
+      setUploadError('Please select at least one image to upload.')
+      return
+    }
     setUploading(true)
+    setUploadProgress(0)
+    setUploadError('')
     try{
       const urls = []
-      for(const item of files){
+      for(let i = 0; i < files.length; i += 1){
+        const item = files[i]
         const sref = ref(storage, `posts/${Date.now()}_${item.file.name}`)
-        await uploadBytes(sref, item.file)
-        const url = await getDownloadURL(sref)
+        const task = uploadBytesResumable(sref, item.file)
+        const url = await new Promise((resolve, reject)=>{
+          task.on('state_changed',
+            (snap)=>{
+              const base = i / files.length
+              const fraction = snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0
+              setUploadProgress(Math.round((base + (fraction / files.length)) * 100))
+            },
+            (err)=>reject(err),
+            async ()=>resolve(await getDownloadURL(task.snapshot.ref))
+          )
+        })
         urls.push(url)
       }
       await addDoc(collection(db,'posts'), {images: urls, caption, hiddenMessage, createdAt: serverTimestamp()})
+      setUploadProgress(100)
       setFiles([])
       setCaption('')
       setHiddenMessage('')
       alert('Uploaded')
     }catch(err){
       console.error(err)
-      alert('Upload failed')
+      setUploadError(err?.message || 'Upload failed. Check Firebase Storage rules and bucket configuration.')
     }finally{ setUploading(false) }
   }
 
@@ -120,25 +94,35 @@ export default function StudioPage(){
           Firebase is not configured, so Studio is read-only for now.
         </div>
       )}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        {user && adminReady ? (
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-[#243447]">
-            Signed in as {user.email}
+      {!unlocked && (
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 text-sm text-soft">
+          <div className="mb-3">Enter the Studio passcode to continue.</div>
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="password"
+              value={passcode}
+              onChange={(e)=>setPasscode(e.target.value)}
+              placeholder="Studio passcode"
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-[#243447] placeholder:text-slate-400"
+            />
+            <button
+              onClick={()=>{
+                if(passcode && passcode === STUDIO_PASSCODE){
+                  setUnlocked(true)
+                  setAuthError('')
+                } else {
+                  setAuthError('Incorrect passcode.')
+                }
+              }}
+              className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white"
+            >
+              Unlock
+            </button>
           </div>
-        ) : (
-          <div className="text-sm text-soft">Signing in to access Studio...</div>
-        )}
-        <button onClick={()=>signOut(auth)} disabled={!user} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-soft disabled:opacity-50">Sign out</button>
-        {authChecked && authError && (
-          <div className="text-xs text-soft">{authError}</div>
-        )}
-      </div>
-      {!adminReady && (
-        <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 text-sm text-soft">
-          Only chetansoyal@gmail.com can access Studio.
+          {authError && <div className="mt-2 text-xs text-soft">{authError}</div>}
         </div>
       )}
-      {adminReady && (
+      {unlocked && (
       <div className="space-y-4 max-w-xl">
         <input type="file" multiple accept="image/*" onChange={onSelect} className="block w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-[#243447] file:mr-4 file:rounded-full file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:text-[#243447]" />
         <div className="grid gap-3">
@@ -165,8 +149,14 @@ export default function StudioPage(){
         <input value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Caption (optional)" className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400" />
         <input value={hiddenMessage} onChange={e=>setHiddenMessage(e.target.value)} placeholder="Hidden message (long-press reveal)" className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400" />
         <div>
-          <button onClick={submit} disabled={uploading || !isFirebaseConfigured || !adminReady} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">{uploading? 'Uploading...' : 'Submit'}</button>
+          <button onClick={submit} disabled={uploading || !isFirebaseConfigured || !unlocked} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">{uploading? 'Uploading...' : 'Submit'}</button>
         </div>
+        {uploading && (
+          <div className="text-xs text-soft">Uploading... {uploadProgress}%</div>
+        )}
+        {uploadError && (
+          <div className="text-xs text-soft">{uploadError}</div>
+        )}
       </div>
       )}
     </div>

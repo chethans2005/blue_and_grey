@@ -6,13 +6,13 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        charcoal: '#e7f3ff',
+        charcoal: '#fbfdff',
         beige: '#1f3b66',
-        soft: '#55729a'
+        soft: '#6b86ab'
       },
       fontFamily: {
-        serif: ['DM Serif Display', 'serif'],
-        cursive: ['Dancing Script', 'cursive']
+        serif: ['Cormorant Garamond', 'serif'],
+        cursive: ['Great Vibes', 'cursive']
       }
     }
   },
