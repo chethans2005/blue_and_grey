@@ -87,8 +87,12 @@ export default function App(){
             >
               <p className="mb-4 text-xs uppercase tracking-[0.35em] text-soft">Workspace: Blue and Grey</p>
               <h2 className="text-5xl font-light leading-tight text-[#1f3b66] sm:text-6xl lg:text-7xl font-cursive">
-                Blue and Grey is a quiet gallery for poems.
+                Blue and Grey<br />
               </h2>
+              <h3 className="text-xl font-light leading-tight text-[#1f3b66] sm:text-5xl lg:text-4xl font-cursive">
+                 &nbsp;                 &nbsp;
+                 is a quiet gallery for poems.
+              </h3>
               <p className="mt-6 max-w-2xl text-base leading-8 text-soft sm:text-lg">
                 A gentle space for visual poems, where each piece opens like an art print, reveals its hidden line on long press, and feels more like moving through a curated exhibition than scrolling a feed.
               </p>
