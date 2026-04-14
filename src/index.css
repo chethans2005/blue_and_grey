@@ -12,11 +12,16 @@ html,body,#root{
   height:100%;
 }
 
+html{
+  scroll-behavior: smooth;
+}
+
 body{
-  @apply bg-charcoal text-beige font-serif;
+  @apply bg-charcoal text-beige;
+  font-family: 'Inter', system-ui, sans-serif;
   background-color: var(--bg);
   color: var(--text);
-  font-weight: 400;
+  font-weight: 300;
   background-image:
     radial-gradient(circle at top left, rgba(140, 186, 236, 0.4), transparent 30%),
     radial-gradient(circle at 90% 10%, rgba(117, 160, 214, 0.28), transparent 26%),

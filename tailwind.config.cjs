@@ -11,7 +11,8 @@ module.exports = {
         soft: '#55729a'
       },
       fontFamily: {
-        serif: ['Playfair Display', 'serif']
+        serif: ['DM Serif Display', 'serif'],
+        cursive: ['Dancing Script', 'cursive']
       }
     }
   },

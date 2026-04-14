@@ -15,6 +15,7 @@ export default function StudioPage(){
   const [adminReady, setAdminReady] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const [authError, setAuthError] = useState('')
+  const [signingIn, setSigningIn] = useState(false)
 
   useEffect(()=>{
     if(!auth) return
@@ -32,6 +33,18 @@ export default function StudioPage(){
     })
     return ()=>unsub()
   },[])
+
+  useEffect(()=>{
+    if(!isFirebaseConfigured || !auth) return
+    if(!authChecked) return
+    if(user || signingIn) return
+    setSigningIn(true)
+    signInWithGoogle()
+      .catch((err)=>{
+        setAuthError(err?.message || 'Sign-in required to access Studio.')
+      })
+      .finally(()=>setSigningIn(false))
+  },[authChecked, user, signingIn])
 
   async function ensureSign(){
     if(!isFirebaseConfigured || !auth) return false
@@ -113,12 +126,9 @@ export default function StudioPage(){
             Signed in as {user.email}
           </div>
         ) : (
-          <div className="text-sm text-soft">Sign in to access Studio.</div>
+          <div className="text-sm text-soft">Signing in to access Studio...</div>
         )}
-        <div className="flex items-center gap-2">
-          <button onClick={signInWithGoogle} disabled={!isFirebaseConfigured} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-[#243447] disabled:opacity-50">Sign in with Google</button>
-          <button onClick={()=>signOut(auth)} disabled={!user} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-soft disabled:opacity-50">Sign out</button>
-        </div>
+        <button onClick={()=>signOut(auth)} disabled={!user} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-soft disabled:opacity-50">Sign out</button>
         {authChecked && authError && (
           <div className="text-xs text-soft">{authError}</div>
         )}

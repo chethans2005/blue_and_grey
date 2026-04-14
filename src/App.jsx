@@ -41,6 +41,7 @@ export default function App(){
   const [posts, setPosts] = useState(demoPosts)
   const [active, setActive] = useState(null)
   const [showNav, setShowNav] = useState(false)
+  const [showScrollHint, setShowScrollHint] = useState(true)
 
   useEffect(()=>{
     if(!isFirebaseConfigured || !db) {
@@ -59,7 +60,9 @@ export default function App(){
 
   useEffect(()=>{
     function onScroll(){
-      setShowNav(window.scrollY > 10)
+      const scrolled = window.scrollY > 10
+      setShowNav(scrolled)
+      setShowScrollHint(!scrolled)
     }
     onScroll()
     window.addEventListener('scroll', onScroll)
@@ -67,10 +70,10 @@ export default function App(){
   },[])
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-x-hidden flex flex-col">
       <Navbar visible={showNav} />
-      <main className="relative">
-        <section className="relative min-h-screen w-screen left-1/2 right-1/2 -mx-[50vw] overflow-hidden">
+      <main className="relative flex-1">
+        <section className="relative min-h-screen w-full overflow-hidden">
           <div className="absolute inset-0">
             <div className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url(${heroImage})`, filter: 'brightness(1.28) saturate(1.2)' }} />
             <div className="absolute inset-0 bg-gradient-to-b from-white/45 via-white/55 to-[#dceeff]" />
@@ -83,7 +86,7 @@ export default function App(){
               className="max-w-3xl"
             >
               <p className="mb-4 text-xs uppercase tracking-[0.35em] text-soft">Workspace: Blue and Grey</p>
-              <h2 className="text-5xl font-light leading-tight text-[#1f3b66] sm:text-6xl lg:text-7xl">
+              <h2 className="text-5xl font-light leading-tight text-[#1f3b66] sm:text-6xl lg:text-7xl font-cursive">
                 Rameesa is a quiet gallery for poems.
               </h2>
               <p className="mt-6 max-w-2xl text-base leading-8 text-soft sm:text-lg">
@@ -91,17 +94,19 @@ export default function App(){
               </p>
             </motion.div>
           </div>
-          <motion.div
-            initial={{opacity: 0, y: 0}}
-            animate={{opacity: 1, y: [0, 6, 0]}}
-            transition={{duration: 2.2, ease: 'easeInOut', repeat: Infinity}}
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 text-xs uppercase tracking-[0.35em] text-[#1f3b66]"
-          >
-            <span className="flex flex-col items-center gap-2">
-              Scroll down
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-300 bg-white/80">↓</span>
-            </span>
-          </motion.div>
+          {showScrollHint && (
+            <motion.div
+              initial={{opacity: 0, y: 0}}
+              animate={{opacity: 1, y: [0, 6, 0]}}
+              transition={{duration: 2.2, ease: 'easeInOut', repeat: Infinity}}
+              className="absolute bottom-8 left-1/2 -translate-x-1/2 text-xs uppercase tracking-[0.35em] text-[#1f3b66]"
+            >
+              <span className="flex flex-col items-center gap-2">
+                Scroll down
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-300 bg-white/80">↓</span>
+              </span>
+            </motion.div>
+          )}
         </section>
 
         <div className="container-center py-6 sm:py-10">
@@ -115,7 +120,7 @@ export default function App(){
             className="sticky top-6 self-start rounded-3xl border border-slate-200/80 bg-white/80 p-6 shadow-[0_18px_44px_rgba(88,110,133,0.08)] backdrop-blur-sm"
           >
             <p className="text-xs uppercase tracking-[0.3em] text-soft">About the poet</p>
-            <h3 className="mt-4 text-3xl font-light text-[#243447]">A study in stillness.</h3>
+            <h3 className="mt-4 text-3xl font-light text-[#243447] font-serif">A study in stillness.</h3>
             <p className="mt-4 text-sm leading-7 text-soft">
               The poet behind Rameesa works with fragments, silence, and image sequences. Each poem is arranged like a small exhibition piece: minimal framing, slow pacing, and a hidden text layer for those who linger.
             </p>
@@ -152,16 +157,20 @@ export default function App(){
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-soft">Selected works</p>
-              <h3 className="mt-3 text-3xl font-light text-[#243447]">Poems as framed objects.</h3>
+              <h3 className="mt-3 text-3xl font-light text-[#243447] font-serif">Poems as framed objects.</h3>
             </div>
-            <p className="hidden max-w-md text-sm leading-7 text-soft md:block">
-              Tap a card to open the poem. On mobile, long press to reveal the hidden line.
-            </p>
           </div>
           <GalleryGrid posts={posts} onOpen={p=>setActive(p)} />
         </section>
         </div>
       </main>
+
+      <footer className="mt-auto border-t border-sky-200/70 py-6 text-xs uppercase tracking-[0.28em] text-soft">
+        <div className="container-center flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <span>© {new Date().getFullYear()} Rameesa</span>
+          <a href="https://instagram.com/blue.and.grey" target="_blank" rel="noreferrer" className="text-[#1f3b66]">@__blue.and.grey__</a>
+        </div>
+      </footer>
 
       <AnimatePresence>
         {active && <PostModal post={active} onClose={()=>setActive(null)} />}
