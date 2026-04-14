@@ -1,9 +1,7 @@
-import React, {useState} from 'react'
-import { storage, db, isFirebaseConfigured } from '../firebase'
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import React, {useState, useEffect} from 'react'
+import { supabase, isSupabaseConfigured, uploadImage, signInWithGoogle, signOut } from '../supabase'
 
-const STUDIO_PASSCODE = import.meta.env.VITE_STUDIO_PASSCODE || ''
+const ADMIN_EMAIL = 'chetansoyal@gmail.com'
 
 export default function StudioPage(){
   const [files, setFiles] = useState([])
@@ -11,10 +9,54 @@ export default function StudioPage(){
   const [hiddenMessage, setHiddenMessage] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [passcode, setPasscode] = useState('')
-  const [unlocked, setUnlocked] = useState(false)
+  const [user, setUser] = useState(null)
+  const [adminReady, setAdminReady] = useState(false)
   const [authError, setAuthError] = useState('')
   const [uploadError, setUploadError] = useState('')
+
+  useEffect(()=>{
+    if(!supabase) return
+    supabase.auth.getUser().then(({ data })=>{
+      const current = data?.user || null
+      setUser(current)
+      const isAdmin = current?.email === ADMIN_EMAIL
+      setAdminReady(isAdmin)
+    })
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session)=>{
+      const current = session?.user || null
+      setUser(current)
+      const isAdmin = current?.email === ADMIN_EMAIL
+      setAdminReady(isAdmin)
+      if(current && !isAdmin){
+        setAuthError('This account is not allowed to access Studio.')
+        signOut()
+      } else {
+        setAuthError('')
+      }
+    })
+
+    return ()=>{
+      authListener?.subscription?.unsubscribe()
+    }
+  },[])
+
+  async function ensureSignIn(){
+    if(!isSupabaseConfigured || !supabase) return false
+    const { data } = await supabase.auth.getUser()
+    if(!data?.user){
+      await signInWithGoogle()
+      return false
+    }
+    const isAdmin = data.user.email === ADMIN_EMAIL
+    setAdminReady(isAdmin)
+    if(!isAdmin){
+      setAuthError('This account is not allowed to access Studio.')
+      await signOut()
+      return false
+    }
+    return true
+  }
 
   function onSelect(e){
     const picked = Array.from(e.target.files).map((file, idx)=>({
@@ -43,11 +85,11 @@ export default function StudioPage(){
   }
 
   async function submit(){
-    if(!isFirebaseConfigured || !storage || !db) {
-      alert('Connect Firebase before using Studio')
+    if(!isSupabaseConfigured || !supabase) {
+      alert('Connect Supabase before using Studio')
       return
     }
-    if(!unlocked) return
+    if(!(await ensureSignIn())) return
     if(files.length === 0) {
       setUploadError('Please select at least one image to upload.')
       return
@@ -59,22 +101,22 @@ export default function StudioPage(){
       const urls = []
       for(let i = 0; i < files.length; i += 1){
         const item = files[i]
-        const sref = ref(storage, `posts/${Date.now()}_${item.file.name}`)
-        const task = uploadBytesResumable(sref, item.file)
-        const url = await new Promise((resolve, reject)=>{
-          task.on('state_changed',
-            (snap)=>{
-              const base = i / files.length
-              const fraction = snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0
-              setUploadProgress(Math.round((base + (fraction / files.length)) * 100))
-            },
-            (err)=>reject(err),
-            async ()=>resolve(await getDownloadURL(task.snapshot.ref))
-          )
+        const url = await uploadImage({
+          file: item.file,
+          onProgress: (percent)=>{
+            const base = i / files.length
+            const blended = base + (percent / 100 / files.length)
+            setUploadProgress(Math.round(blended * 100))
+          }
         })
         urls.push(url)
       }
-      await addDoc(collection(db,'posts'), {images: urls, caption, hiddenMessage, createdAt: serverTimestamp()})
+      const { error } = await supabase.from('posts').insert({
+        images: urls,
+        caption,
+        hidden_message: hiddenMessage
+      })
+      if(error) throw error
       setUploadProgress(100)
       setFiles([])
       setCaption('')
@@ -82,7 +124,7 @@ export default function StudioPage(){
       alert('Uploaded')
     }catch(err){
       console.error(err)
-      setUploadError(err?.message || 'Upload failed. Check Firebase Storage rules and bucket configuration.')
+      setUploadError(err?.message || 'Upload failed. Check Supabase Storage rules and bucket configuration.')
     }finally{ setUploading(false) }
   }
 
@@ -94,35 +136,21 @@ export default function StudioPage(){
           Firebase is not configured, so Studio is read-only for now.
         </div>
       )}
-      {!unlocked && (
+      {!adminReady && (
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 text-sm text-soft">
-          <div className="mb-3">Enter the Studio passcode to continue.</div>
+          <div className="mb-3">Sign in with Google to access Studio.</div>
           <div className="flex flex-wrap gap-2">
-            <input
-              type="password"
-              value={passcode}
-              onChange={(e)=>setPasscode(e.target.value)}
-              placeholder="Studio passcode"
-              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-[#243447] placeholder:text-slate-400"
-            />
             <button
-              onClick={()=>{
-                if(passcode && passcode === STUDIO_PASSCODE){
-                  setUnlocked(true)
-                  setAuthError('')
-                } else {
-                  setAuthError('Incorrect passcode.')
-                }
-              }}
+              onClick={ensureSignIn}
               className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white"
             >
-              Unlock
+              Sign in with Google
             </button>
           </div>
           {authError && <div className="mt-2 text-xs text-soft">{authError}</div>}
         </div>
       )}
-      {unlocked && (
+      {adminReady && (
       <div className="space-y-4 max-w-xl">
         <input type="file" multiple accept="image/*" onChange={onSelect} className="block w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-[#243447] file:mr-4 file:rounded-full file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:text-[#243447]" />
         <div className="grid gap-3">
@@ -149,7 +177,7 @@ export default function StudioPage(){
         <input value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Caption (optional)" className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400" />
         <input value={hiddenMessage} onChange={e=>setHiddenMessage(e.target.value)} placeholder="Hidden message (long-press reveal)" className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400" />
         <div>
-          <button onClick={submit} disabled={uploading || !isFirebaseConfigured || !unlocked} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">{uploading? 'Uploading...' : 'Submit'}</button>
+          <button onClick={submit} disabled={uploading || !isFirebaseConfigured || !adminReady} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">{uploading? 'Uploading...' : 'Submit'}</button>
         </div>
         {uploading && (
           <div className="text-xs text-soft">Uploading... {uploadProgress}%</div>

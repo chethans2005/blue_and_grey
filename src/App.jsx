@@ -3,8 +3,7 @@ import Navbar from './components/Navbar'
 import GalleryGrid from './components/GalleryGrid'
 import PostModal from './components/PostModal'
 import { AnimatePresence, motion } from 'framer-motion'
-import { db, isFirebaseConfigured } from './firebase'
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore'
+import { supabase, isSupabaseConfigured } from './supabase'
 import heroImage from './assets/hero.png'
 
 const demoPosts = [
@@ -15,7 +14,7 @@ const demoPosts = [
       'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80'
     ],
     caption: 'A quiet place for image poems.',
-    hiddenMessage: 'The page is alive even before Firebase is connected.'
+    hiddenMessage: 'The page is alive even before Supabase is connected.'
   },
   {
     id: 'demo-2',
@@ -44,18 +43,34 @@ export default function App(){
   const [showScrollHint, setShowScrollHint] = useState(true)
 
   useEffect(()=>{
-    if(!isFirebaseConfigured || !db) {
+    if(!isSupabaseConfigured || !supabase) {
       setPosts(demoPosts)
       return
     }
 
-    const q = query(collection(db,'posts'), orderBy('createdAt','desc'))
-    const unsub = onSnapshot(q, snap=>{
-      setPosts(snap.docs.map(d=>({id:d.id, ...d.data()})))
-    }, err=>{
-      console.error('Firebase connection failed', err)
-    })
-    return unsub
+    let cancelled = false
+    async function load(){
+      const { data, error } = await supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if(cancelled) return
+      if(error){
+        console.error('Supabase fetch failed', error)
+        setPosts(demoPosts)
+        return
+      }
+      setPosts((data || []).map((row)=>({
+        id: row.id,
+        images: row.images || [],
+        caption: row.caption || '',
+        hiddenMessage: row.hidden_message || ''
+      })))
+    }
+
+    load()
+    return ()=>{ cancelled = true }
   },[])
 
   useEffect(()=>{

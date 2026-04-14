@@ -1,37 +1,87 @@
 import React, {useState, useEffect} from 'react'
-import { db, auth, signInWithGoogle, isFirebaseConfigured } from '../firebase'
-import { onAuthStateChanged } from 'firebase/auth'
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore'
+import { supabase, isSupabaseConfigured, signInWithGoogle } from '../supabase'
 
 export default function CommentSection({postId}){
   const [comments, setComments] = useState([])
   const [text, setText] = useState('')
-  const [user, setUser] = useState(auth?.currentUser ?? null)
+  const [user, setUser] = useState(null)
 
   useEffect(()=>{
-    if(!isFirebaseConfigured || !db || !auth) return
-    const q = query(collection(db,'posts',postId,'comments'), orderBy('createdAt','asc'))
-    const unsub = onSnapshot(q, snap=> setComments(snap.docs.map(d=>({id:d.id, ...d.data()}))))
-    const unsubAuth = onAuthStateChanged(auth, u=>setUser(u))
-    return ()=>{unsub(); unsubAuth()}
+    if(!isSupabaseConfigured || !supabase) return
+    let cancelled = false
+
+    async function load(){
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true })
+
+      if(cancelled) return
+      if(error){
+        console.error('Supabase comments fetch failed', error)
+        return
+      }
+      setComments((data || []).map((row)=>({
+        id: row.id,
+        text: row.text,
+        author: row.author_email,
+        createdAt: row.created_at
+      })))
+    }
+
+    async function loadUser(){
+      const { data } = await supabase.auth.getUser()
+      setUser(data?.user || null)
+    }
+
+    load()
+    loadUser()
+
+    const channel = supabase
+      .channel(`comments-${postId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'comments', filter: `post_id=eq.${postId}` },
+        load
+      )
+      .subscribe()
+
+    return ()=>{
+      cancelled = true
+      supabase.removeChannel(channel)
+    }
   },[postId])
 
   async function submit(){
-    if(!isFirebaseConfigured || !db || !auth) return
-    if(!user) {
+    if(!isSupabaseConfigured || !supabase) return
+    if(!user){
       await signInWithGoogle()
+      const { data } = await supabase.auth.getUser()
+      if(!data?.user) return
+      setUser(data.user)
     }
-    if(!auth.currentUser) return
     if(!text.trim()) return
-    await addDoc(collection(db,'posts',postId,'comments'), {text: text.trim(), author: auth.currentUser.email, createdAt: serverTimestamp()})
+    const { error } = await supabase.from('comments').insert({
+      post_id: postId,
+      text: text.trim(),
+      author_email: user.email
+    })
+    if(error){
+      console.error('Supabase comment insert failed', error)
+      return
+    }
     setText('')
   }
 
   async function del(id){
     // admin check: simple email guard
     const adminEmails = (import.meta.env.VITE_ADMIN_EMAILS || '').split(',').map(s=>s.trim())
-    if(!isFirebaseConfigured || !auth?.currentUser || !adminEmails.includes(auth.currentUser.email)) return
-    await deleteDoc(doc(db,'posts',postId,'comments',id))
+    if(!user || !adminEmails.includes(user.email)) return
+    const { error } = await supabase.from('comments').delete().eq('id', id)
+    if(error){
+      console.error('Supabase comment delete failed', error)
+    }
   }
 
   return (
@@ -49,10 +99,10 @@ export default function CommentSection({postId}){
       </div>
 
       <div className="mt-4 flex gap-2">
-        <input value={text} onChange={e=>setText(e.target.value)} placeholder={isFirebaseConfigured ? 'Leave a quiet thought' : 'Enable Firebase to comment'} disabled={!isFirebaseConfigured} className="flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400 disabled:opacity-50" />
-        <button onClick={submit} disabled={!isFirebaseConfigured} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">Post</button>
+        <input value={text} onChange={e=>setText(e.target.value)} placeholder={isSupabaseConfigured ? 'Leave a quiet thought' : 'Enable Supabase to comment'} disabled={!isSupabaseConfigured} className="flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400 disabled:opacity-50" />
+        <button onClick={submit} disabled={!isSupabaseConfigured} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">Post</button>
       </div>
-      {!isFirebaseConfigured && <p className="mt-2 text-xs text-soft">Comments are hidden until Firebase is connected.</p>}
+      {!isSupabaseConfigured && <p className="mt-2 text-xs text-soft">Comments are hidden until Supabase is connected.</p>}
     </div>
   )
 }
