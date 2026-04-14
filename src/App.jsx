@@ -43,7 +43,7 @@ export default function App(){
       <Navbar/>
       <main className="container-center py-8">
         {!isFirebaseConfigured && (
-          <div className="mb-6 rounded border border-[#4a403a] bg-[#231c19] px-4 py-3 text-sm text-soft">
+          <div className="mb-6 rounded-2xl border border-slate-200/90 bg-white/75 px-4 py-3 text-sm text-soft backdrop-blur-sm">
             Firebase is not configured yet, so Rameesa is showing demo poems. Add your `VITE_...` env values to enable uploads, comments, and the studio.
           </div>
         )}

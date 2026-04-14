@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 :root{
-  --bg: #2b2623; /* charcoal/deep brown */
-  --muted: #efe6db; /* soft beige */
+  --bg: #eef3f8;
+  --text: #243447;
+  --muted: #65758a;
 }
 
 html,body,#root{
@@ -14,8 +15,17 @@ html,body,#root{
 body{
   @apply bg-charcoal text-beige font-serif;
   background-color: var(--bg);
-  color: var(--muted);
+  color: var(--text);
+  background-image:
+    radial-gradient(circle at top left, rgba(185, 203, 219, 0.35), transparent 28%),
+    radial-gradient(circle at 90% 10%, rgba(146, 173, 199, 0.18), transparent 24%),
+    linear-gradient(180deg, #f6f9fc 0%, #e9eff5 100%);
   -webkit-font-smoothing:antialiased;
+}
+
+::selection{
+  background: rgba(125, 153, 179, 0.26);
+  color: #243447;
 }
 
 .container-center{
@@ -27,5 +37,5 @@ body{
 }
 
 .card-shadow{
-  box-shadow: none;
+  box-shadow: 0 14px 36px rgba(88, 110, 133, 0.08);
 }

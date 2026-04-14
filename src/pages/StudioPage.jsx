@@ -55,23 +55,23 @@ export default function StudioPage(){
 
   return (
     <div className="min-h-screen p-6 container-center">
-      <h2 className="text-xl mb-4">Studio (hidden)</h2>
+      <h2 className="mb-4 text-xl text-[#243447]">Studio (hidden)</h2>
       {!isFirebaseConfigured && (
-        <div className="mb-4 rounded border border-[#4a403a] bg-[#231c19] px-4 py-3 text-sm text-soft">
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-white/75 px-4 py-3 text-sm text-soft backdrop-blur-sm">
           Firebase is not configured, so Studio is read-only for now.
         </div>
       )}
       <div className="space-y-4 max-w-xl">
-        <input type="file" multiple accept="image/*" onChange={onSelect} />
+        <input type="file" multiple accept="image/*" onChange={onSelect} className="block w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-[#243447] file:mr-4 file:rounded-full file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:text-[#243447]" />
         <div className="grid grid-cols-3 gap-2">
           {files.map((f,idx)=> (
-            <img key={idx} src={URL.createObjectURL(f)} alt="preview" className="w-full h-24 object-cover rounded" />
+            <img key={idx} src={URL.createObjectURL(f)} alt="preview" className="h-24 w-full rounded-2xl object-cover ring-1 ring-slate-200" />
           ))}
         </div>
-        <input value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Caption (optional)" className="w-full px-3 py-2 rounded bg-[#141212]" />
-        <input value={hiddenMessage} onChange={e=>setHiddenMessage(e.target.value)} placeholder="Hidden message (long-press reveal)" className="w-full px-3 py-2 rounded bg-[#141212]" />
+        <input value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Caption (optional)" className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400" />
+        <input value={hiddenMessage} onChange={e=>setHiddenMessage(e.target.value)} placeholder="Hidden message (long-press reveal)" className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400" />
         <div>
-          <button onClick={submit} disabled={uploading || !isFirebaseConfigured} className="px-4 py-2 rounded bg-[#3a332f] disabled:opacity-50">{uploading? 'Uploading...' : 'Submit'}</button>
+          <button onClick={submit} disabled={uploading || !isFirebaseConfigured} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">{uploading? 'Uploading...' : 'Submit'}</button>
         </div>
       </div>
     </div>

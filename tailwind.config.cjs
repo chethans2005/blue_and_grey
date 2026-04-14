@@ -6,9 +6,9 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        charcoal: '#2b2623',
-        beige: '#efe6db',
-        soft: '#d9cfc4'
+        charcoal: '#eef3f8',
+        beige: '#243447',
+        soft: '#65758a'
       },
       fontFamily: {
         serif: ['Playfair Display', 'serif']

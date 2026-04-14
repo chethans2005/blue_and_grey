@@ -17,18 +17,18 @@ export default function ImageCarousel({images=[], hiddenMessage}){
 
   return (
     <div className="relative">
-      <div className="w-full h-[60vh] sm:h-[70vh] bg-[#1a1513] flex items-center justify-center rounded-md overflow-hidden" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onMouseDown={startPress} onMouseUp={endPress} onMouseLeave={endPress} onTouchStartCapture={startPress} onTouchEnd={endPress}>
+      <div className="flex h-[60vh] w-full items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-b from-slate-100 to-white sm:h-[70vh]" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onMouseDown={startPress} onMouseUp={endPress} onMouseLeave={endPress} onTouchStartCapture={startPress} onTouchEnd={endPress}>
         {images[i] ? <img src={images[i]} alt="slide" className="w-full h-full object-contain"/> : <div className="text-soft p-12">No image</div>}
         {hiddenMessage && reveal && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-beige text-lg p-6">{hiddenMessage}</div>
+          <div className="absolute inset-0 flex items-center justify-center bg-white/70 p-6 text-lg text-[#243447] backdrop-blur-sm">{hiddenMessage}</div>
         )}
       </div>
 
       <div className="mt-3 flex items-center justify-between text-sm">
         <div className="text-soft">{i+1} / {images.length}</div>
         <div className="space-x-2">
-          <button onClick={prev} className="px-3 py-1 rounded bg-transparent border border-[#3b3735]">◀</button>
-          <button onClick={next} className="px-3 py-1 rounded bg-transparent border border-[#3b3735]">▶</button>
+          <button onClick={prev} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[#243447]">◀</button>
+          <button onClick={next} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[#243447]">▶</button>
         </div>
       </div>
     </div>

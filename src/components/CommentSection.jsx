@@ -38,19 +38,19 @@ export default function CommentSection({postId}){
     <div>
       <div className="space-y-3">
         {comments.map(c=> (
-          <div key={c.id} className="bg-[#1f1a19] p-3 rounded">
+          <div key={c.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
             <div className="text-xs text-soft">{c.author}</div>
             <div className="mt-1">{c.text}</div>
             {auth.currentUser && (import.meta.env.VITE_ADMIN_EMAILS || '').split(',').map(s=>s.trim()).includes(auth.currentUser.email) && (
-              <button onClick={()=>del(c.id)} className="text-xs mt-2 text-red-400">Delete</button>
+              <button onClick={()=>del(c.id)} className="mt-2 text-xs text-slate-500 underline decoration-slate-300 underline-offset-2">Delete</button>
             )}
           </div>
         ))}
       </div>
 
       <div className="mt-4 flex gap-2">
-        <input value={text} onChange={e=>setText(e.target.value)} placeholder={isFirebaseConfigured ? 'Leave a quiet thought' : 'Enable Firebase to comment'} disabled={!isFirebaseConfigured} className="flex-1 px-3 py-2 rounded bg-[#141212] disabled:opacity-50" />
-        <button onClick={submit} disabled={!isFirebaseConfigured} className="px-3 py-2 rounded bg-[#3a332f] disabled:opacity-50">Post</button>
+        <input value={text} onChange={e=>setText(e.target.value)} placeholder={isFirebaseConfigured ? 'Leave a quiet thought' : 'Enable Firebase to comment'} disabled={!isFirebaseConfigured} className="flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400 disabled:opacity-50" />
+        <button onClick={submit} disabled={!isFirebaseConfigured} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">Post</button>
       </div>
       {!isFirebaseConfigured && <p className="mt-2 text-xs text-soft">Comments are hidden until Firebase is connected.</p>}
     </div>
