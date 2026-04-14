@@ -1,5 +1,6 @@
-import React, {useState} from 'react'
+import React, {useState, useEffect} from 'react'
 import { auth, signInWithGoogle, storage, db, isFirebaseConfigured } from '../firebase'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 
@@ -11,12 +12,25 @@ export default function StudioPage(){
   const [caption, setCaption] = useState('')
   const [hiddenMessage, setHiddenMessage] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [adminReady, setAdminReady] = useState(false)
+
+  useEffect(()=>{
+    if(!auth) return
+    const unsub = onAuthStateChanged(auth, (u)=>{
+      setUser(u)
+      const isAdmin = ADMIN_EMAILS.includes(u?.email || '')
+      setAdminReady(isAdmin)
+    })
+    return ()=>unsub()
+  },[])
 
   async function ensureSign(){
     if(!isFirebaseConfigured || !auth) return false
     if(!auth.currentUser) await signInWithGoogle()
     setUser(auth.currentUser)
-    if(!ADMIN_EMAILS.includes(auth.currentUser?.email)){
+    const isAdmin = ADMIN_EMAILS.includes(auth.currentUser?.email)
+    setAdminReady(isAdmin)
+    if(!isAdmin){
       alert('Not authorized')
       return false
     }
@@ -24,7 +38,29 @@ export default function StudioPage(){
   }
 
   function onSelect(e){
-    setFiles(Array.from(e.target.files))
+    const picked = Array.from(e.target.files).map((file, idx)=>({
+      id: `${Date.now()}-${idx}-${file.name}`,
+      file,
+      previewUrl: URL.createObjectURL(file)
+    }))
+    setFiles(picked)
+  }
+
+  function removeFile(id){
+    setFiles(prev=>prev.filter(item=>item.id !== id))
+  }
+
+  function moveFile(id, direction){
+    setFiles(prev=>{
+      const index = prev.findIndex(item=>item.id === id)
+      if(index < 0) return prev
+      const nextIndex = direction === 'up' ? index - 1 : index + 1
+      if(nextIndex < 0 || nextIndex >= prev.length) return prev
+      const copy = [...prev]
+      const [item] = copy.splice(index, 1)
+      copy.splice(nextIndex, 0, item)
+      return copy
+    })
   }
 
   async function submit(){
@@ -36,9 +72,9 @@ export default function StudioPage(){
     setUploading(true)
     try{
       const urls = []
-      for(const f of files){
-        const sref = ref(storage, `posts/${Date.now()}_${f.name}`)
-        await uploadBytes(sref, f)
+      for(const item of files){
+        const sref = ref(storage, `posts/${Date.now()}_${item.file.name}`)
+        await uploadBytes(sref, item.file)
         const url = await getDownloadURL(sref)
         urls.push(url)
       }
@@ -61,17 +97,49 @@ export default function StudioPage(){
           Firebase is not configured, so Studio is read-only for now.
         </div>
       )}
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        {user ? (
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-[#243447]">
+            Signed in as {user.email}
+          </div>
+        ) : (
+          <div className="text-sm text-soft">Sign in to access Studio.</div>
+        )}
+        <div className="flex items-center gap-2">
+          <button onClick={signInWithGoogle} disabled={!isFirebaseConfigured} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-[#243447] disabled:opacity-50">Sign in with Google</button>
+          <button onClick={()=>signOut(auth)} disabled={!user} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-soft disabled:opacity-50">Sign out</button>
+        </div>
+        {user && !adminReady && (
+          <div className="text-xs text-soft">This account is not on the admin list.</div>
+        )}
+      </div>
       <div className="space-y-4 max-w-xl">
         <input type="file" multiple accept="image/*" onChange={onSelect} className="block w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-[#243447] file:mr-4 file:rounded-full file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:text-[#243447]" />
-        <div className="grid grid-cols-3 gap-2">
-          {files.map((f,idx)=> (
-            <img key={idx} src={URL.createObjectURL(f)} alt="preview" className="h-24 w-full rounded-2xl object-cover ring-1 ring-slate-200" />
+        <div className="grid gap-3">
+          {files.map((item, idx)=> (
+            <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-2">
+              <img src={item.previewUrl} alt="preview" className="h-20 w-24 rounded-xl object-cover ring-1 ring-slate-200" />
+              <div className="flex-1">
+                <div className="text-xs text-soft">Image {idx + 1}</div>
+                <div className="text-sm text-[#243447] truncate">{item.file.name}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={()=>moveFile(item.id, 'up')} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-[#243447]">Up</button>
+                <button onClick={()=>moveFile(item.id, 'down')} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-[#243447]">Down</button>
+                <button onClick={()=>removeFile(item.id)} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-soft">Remove</button>
+              </div>
+            </div>
           ))}
+          {files.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center text-sm text-soft">
+              Upload images to preview, reorder, or remove before submitting.
+            </div>
+          )}
         </div>
         <input value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Caption (optional)" className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400" />
         <input value={hiddenMessage} onChange={e=>setHiddenMessage(e.target.value)} placeholder="Hidden message (long-press reveal)" className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400" />
         <div>
-          <button onClick={submit} disabled={uploading || !isFirebaseConfigured} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">{uploading? 'Uploading...' : 'Submit'}</button>
+          <button onClick={submit} disabled={uploading || !isFirebaseConfigured || !adminReady} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">{uploading? 'Uploading...' : 'Submit'}</button>
         </div>
       </div>
     </div>
