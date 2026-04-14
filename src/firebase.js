@@ -12,13 +12,17 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 }
 
-const app = initializeApp(firebaseConfig)
-export const auth = getAuth(app)
+export const isFirebaseConfigured = Object.values(firebaseConfig).every(Boolean)
+
+const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null
+
+export const auth = app ? getAuth(app) : null
 export const provider = new GoogleAuthProvider()
-export const db = getFirestore(app)
-export const storage = getStorage(app)
+export const db = app ? getFirestore(app) : null
+export const storage = app ? getStorage(app) : null
 export { serverTimestamp, signInWithPopup }
 
 export async function signInWithGoogle(){
+  if(!auth) throw new Error('Firebase is not configured')
   return await signInWithPopup(auth, provider)
 }

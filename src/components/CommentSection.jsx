@@ -1,14 +1,15 @@
 import React, {useState, useEffect} from 'react'
-import { db, auth, signInWithGoogle } from '../firebase'
+import { db, auth, signInWithGoogle, isFirebaseConfigured } from '../firebase'
 import { onAuthStateChanged } from 'firebase/auth'
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc } from 'firebase/firestore'
 
 export default function CommentSection({postId}){
   const [comments, setComments] = useState([])
   const [text, setText] = useState('')
-  const [user, setUser] = useState(auth.currentUser)
+  const [user, setUser] = useState(auth?.currentUser ?? null)
 
   useEffect(()=>{
+    if(!isFirebaseConfigured || !db || !auth) return
     const q = query(collection(db,'posts',postId,'comments'), orderBy('createdAt','asc'))
     const unsub = onSnapshot(q, snap=> setComments(snap.docs.map(d=>({id:d.id, ...d.data()}))))
     const unsubAuth = onAuthStateChanged(auth, u=>setUser(u))
@@ -16,6 +17,7 @@ export default function CommentSection({postId}){
   },[postId])
 
   async function submit(){
+    if(!isFirebaseConfigured || !db || !auth) return
     if(!user) {
       await signInWithGoogle()
     }
@@ -28,7 +30,7 @@ export default function CommentSection({postId}){
   async function del(id){
     // admin check: simple email guard
     const adminEmails = (import.meta.env.VITE_ADMIN_EMAILS || '').split(',').map(s=>s.trim())
-    if(!auth.currentUser || !adminEmails.includes(auth.currentUser.email)) return
+    if(!isFirebaseConfigured || !auth?.currentUser || !adminEmails.includes(auth.currentUser.email)) return
     await deleteDoc(doc(db,'posts',postId,'comments',id))
   }
 
@@ -47,9 +49,10 @@ export default function CommentSection({postId}){
       </div>
 
       <div className="mt-4 flex gap-2">
-        <input value={text} onChange={e=>setText(e.target.value)} placeholder="Leave a quiet thought" className="flex-1 px-3 py-2 rounded bg-[#141212]" />
-        <button onClick={submit} className="px-3 py-2 rounded bg-[#3a332f]">Post</button>
+        <input value={text} onChange={e=>setText(e.target.value)} placeholder={isFirebaseConfigured ? 'Leave a quiet thought' : 'Enable Firebase to comment'} disabled={!isFirebaseConfigured} className="flex-1 px-3 py-2 rounded bg-[#141212] disabled:opacity-50" />
+        <button onClick={submit} disabled={!isFirebaseConfigured} className="px-3 py-2 rounded bg-[#3a332f] disabled:opacity-50">Post</button>
       </div>
+      {!isFirebaseConfigured && <p className="mt-2 text-xs text-soft">Comments are hidden until Firebase is connected.</p>}
     </div>
   )
 }
