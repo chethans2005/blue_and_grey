@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --bg: #2b2623; /* charcoal/deep brown */
+  --muted: #efe6db; /* soft beige */
+}
+
+html,body,#root{
+  height:100%;
+}
+
+body{
+  @apply bg-charcoal text-beige font-serif;
+  background-color: var(--bg);
+  color: var(--muted);
+  -webkit-font-smoothing:antialiased;
+}
+
+.container-center{
+  max-width:1100px;
+  margin-left:auto;
+  margin-right:auto;
+  padding-left:1rem;
+  padding-right:1rem;
+}
+
+.card-shadow{
+  box-shadow: none;
+}
