@@ -4,7 +4,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 
-const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS||'').split(',').map(s=>s.trim())
+const ADMIN_EMAILS = ['chetansoyal@gmail.com']
 
 export default function StudioPage(){
   const [user, setUser] = useState(auth?.currentUser ?? null)
@@ -13,6 +13,8 @@ export default function StudioPage(){
   const [hiddenMessage, setHiddenMessage] = useState('')
   const [uploading, setUploading] = useState(false)
   const [adminReady, setAdminReady] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [authError, setAuthError] = useState('')
 
   useEffect(()=>{
     if(!auth) return
@@ -20,6 +22,13 @@ export default function StudioPage(){
       setUser(u)
       const isAdmin = ADMIN_EMAILS.includes(u?.email || '')
       setAdminReady(isAdmin)
+      setAuthChecked(true)
+      if(u && !isAdmin){
+        setAuthError('This account is not allowed to access Studio.')
+        signOut(auth)
+      } else {
+        setAuthError('')
+      }
     })
     return ()=>unsub()
   },[])
@@ -31,7 +40,8 @@ export default function StudioPage(){
     const isAdmin = ADMIN_EMAILS.includes(auth.currentUser?.email)
     setAdminReady(isAdmin)
     if(!isAdmin){
-      alert('Not authorized')
+      setAuthError('This account is not allowed to access Studio.')
+      await signOut(auth)
       return false
     }
     return true
@@ -98,7 +108,7 @@ export default function StudioPage(){
         </div>
       )}
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        {user ? (
+        {user && adminReady ? (
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-[#243447]">
             Signed in as {user.email}
           </div>
@@ -109,10 +119,16 @@ export default function StudioPage(){
           <button onClick={signInWithGoogle} disabled={!isFirebaseConfigured} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-[#243447] disabled:opacity-50">Sign in with Google</button>
           <button onClick={()=>signOut(auth)} disabled={!user} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-soft disabled:opacity-50">Sign out</button>
         </div>
-        {user && !adminReady && (
-          <div className="text-xs text-soft">This account is not on the admin list.</div>
+        {authChecked && authError && (
+          <div className="text-xs text-soft">{authError}</div>
         )}
       </div>
+      {!adminReady && (
+        <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 text-sm text-soft">
+          Only chetansoyal@gmail.com can access Studio.
+        </div>
+      )}
+      {adminReady && (
       <div className="space-y-4 max-w-xl">
         <input type="file" multiple accept="image/*" onChange={onSelect} className="block w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-[#243447] file:mr-4 file:rounded-full file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:text-[#243447]" />
         <div className="grid gap-3">
@@ -142,6 +158,7 @@ export default function StudioPage(){
           <button onClick={submit} disabled={uploading || !isFirebaseConfigured || !adminReady} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">{uploading? 'Uploading...' : 'Submit'}</button>
         </div>
       </div>
+      )}
     </div>
   )
 }

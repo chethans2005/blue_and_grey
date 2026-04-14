@@ -40,90 +40,71 @@ const demoPosts = [
 export default function App(){
   const [posts, setPosts] = useState(demoPosts)
   const [active, setActive] = useState(null)
-  const [firebaseReady, setFirebaseReady] = useState(false)
-  const [firebaseError, setFirebaseError] = useState('')
+  const [showNav, setShowNav] = useState(false)
 
   useEffect(()=>{
     if(!isFirebaseConfigured || !db) {
       setPosts(demoPosts)
-      setFirebaseReady(false)
-      setFirebaseError('')
       return
     }
 
     const q = query(collection(db,'posts'), orderBy('createdAt','desc'))
-    const unsub = onSnapshot(
-      q,
-      snap=>{
-        setPosts(snap.docs.map(d=>({id:d.id, ...d.data()})))
-        setFirebaseReady(true)
-        setFirebaseError('')
-      },
-      err=>{
-        setFirebaseError(err?.message || 'Firebase connection failed')
-        setFirebaseReady(false)
-      }
-    )
+    const unsub = onSnapshot(q, snap=>{
+      setPosts(snap.docs.map(d=>({id:d.id, ...d.data()})))
+    }, err=>{
+      console.error('Firebase connection failed', err)
+    })
     return unsub
+  },[])
+
+  useEffect(()=>{
+    function onScroll(){
+      setShowNav(window.scrollY > 10)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll)
+    return ()=>window.removeEventListener('scroll', onScroll)
   },[])
 
   return (
     <div className="min-h-screen">
-      <Navbar/>
-      <main className="container-center relative py-6 sm:py-10">
-        <div className="pointer-events-none absolute -top-6 right-4 hidden h-48 w-48 rounded-full bg-slate-200/60 blur-3xl lg:block" />
-        <div className="pointer-events-none absolute left-0 top-28 hidden h-56 w-56 rounded-full bg-slate-300/40 blur-3xl lg:block" />
-
-        <section className="grid gap-10 py-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:py-16">
-          <motion.div
-            initial={{opacity: 0, y: 18}}
-            animate={{opacity: 1, y: 0}}
-            transition={{duration: 0.7, ease: 'easeOut'}}
-            className="max-w-3xl"
-          >
-            <p className="mb-4 text-xs uppercase tracking-[0.35em] text-soft">Poetry gallery</p>
-            <h2 className="text-5xl font-light leading-tight text-[#243447] sm:text-6xl lg:text-7xl">
-              <i>Blue and Grey</i> is a quiet gallery for poems
-            </h2>
-            <p className="mt-6 max-w-2xl text-base leading-8 text-soft sm:text-lg">
-              A gentle space for visual poems, where each piece opens like an art print, reveals its hidden line on long press, and feels more like moving through a curated exhibition than scrolling a feed.
-            </p>
-          </motion.div>
-
-          <motion.aside
-            initial={{opacity: 0, y: 22}}
-            animate={{opacity: 1, y: 0}}
-            transition={{duration: 0.7, ease: 'easeOut', delay: 0.1}}
-            className="relative grid gap-5 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/80 p-6 shadow-[0_18px_44px_rgba(88,110,133,0.08)] backdrop-blur-sm"
-          >
-            <div className="absolute inset-0">
-              <div className="h-full w-full bg-cover bg-center opacity-10" style={{ backgroundImage: `url(${heroImage})` }} />
-              <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-white/80 to-white/95" />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-soft">Current note</p>
-              <p className="mt-4 text-lg leading-8 text-[#243447]">
-                Scroll down to enter the poet's notes, then the body of work.
+      <Navbar visible={showNav} />
+      <main className="relative">
+        <section className="relative min-h-screen w-screen left-1/2 right-1/2 -mx-[50vw] overflow-hidden">
+          <div className="absolute inset-0">
+            <div className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url(${heroImage})`, filter: 'brightness(1.28) saturate(1.2)' }} />
+            <div className="absolute inset-0 bg-gradient-to-b from-white/45 via-white/55 to-[#dceeff]" />
+          </div>
+          <div className="container-center relative z-10 flex min-h-screen items-center py-20">
+            <motion.div
+              initial={{opacity: 0, y: 18}}
+              animate={{opacity: 1, y: 0}}
+              transition={{duration: 0.7, ease: 'easeOut'}}
+              className="max-w-3xl"
+            >
+              <p className="mb-4 text-xs uppercase tracking-[0.35em] text-soft">Workspace: Blue and Grey</p>
+              <h2 className="text-5xl font-light leading-tight text-[#1f3b66] sm:text-6xl lg:text-7xl">
+                Rameesa is a quiet gallery for poems.
+              </h2>
+              <p className="mt-6 max-w-2xl text-base leading-8 text-soft sm:text-lg">
+                A gentle space for visual poems, where each piece opens like an art print, reveals its hidden line on long press, and feels more like moving through a curated exhibition than scrolling a feed.
               </p>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="h-24 rounded-2xl bg-slate-100" />
-              <div className="h-24 rounded-2xl bg-slate-200" />
-              <div className="h-24 rounded-2xl bg-slate-100" />
-            </div>
-          </motion.aside>
+            </motion.div>
+          </div>
+          <motion.div
+            initial={{opacity: 0, y: 0}}
+            animate={{opacity: 1, y: [0, 6, 0]}}
+            transition={{duration: 2.2, ease: 'easeInOut', repeat: Infinity}}
+            className="absolute bottom-8 left-1/2 -translate-x-1/2 text-xs uppercase tracking-[0.35em] text-[#1f3b66]"
+          >
+            <span className="flex flex-col items-center gap-2">
+              Scroll down
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-300 bg-white/80">↓</span>
+            </span>
+          </motion.div>
         </section>
 
-        {!isFirebaseConfigured && (
-          <div className="mb-10 rounded-2xl border border-slate-200/90 bg-white/75 px-4 py-3 text-sm text-soft backdrop-blur-sm">
-            Firebase is not configured yet, so Rameesa is showing demo poems. Add your Vite env values to enable uploads, comments, and the studio.
-          </div>
-        )}
-        {import.meta.env.DEV && isFirebaseConfigured && (firebaseError || firebaseReady) && (
-          <div className="mb-10 rounded-2xl border border-slate-200/90 bg-white/75 px-4 py-3 text-sm text-soft backdrop-blur-sm">
-            Firebase status: {firebaseError ? `Error - ${firebaseError}` : 'Connected'}
-          </div>
-        )}
+        <div className="container-center py-6 sm:py-10">
 
         <section id="about" className="grid gap-6 py-12 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
           <motion.div
@@ -179,6 +160,7 @@ export default function App(){
           </div>
           <GalleryGrid posts={posts} onOpen={p=>setActive(p)} />
         </section>
+        </div>
       </main>
 
       <AnimatePresence>
