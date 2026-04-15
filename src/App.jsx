@@ -1,9 +1,9 @@
-import React, {useState, useEffect} from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Navbar from './components/Navbar'
 import GalleryGrid from './components/GalleryGrid'
 import PostModal from './components/PostModal'
 import { AnimatePresence, motion } from 'framer-motion'
-import { supabase, isSupabaseConfigured } from './supabase'
+import { isApiConfigured, signInWithGoogle, getAuthUser } from './api'
 import heroImage from './assets/hero.png'
 
 const demoPosts = [
@@ -14,7 +14,8 @@ const demoPosts = [
       'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80'
     ],
     caption: 'A quiet place for image poems.',
-    hiddenMessage: 'The page is alive even before Supabase is connected.'
+    hiddenMessage: 'The page is alive even before the backend is connected.',
+    likesCount: 0
   },
   {
     id: 'demo-2',
@@ -23,7 +24,8 @@ const demoPosts = [
       'https://images.unsplash.com/photo-1499084732479-de2c02d45fc4?auto=format&fit=crop&w=1200&q=80'
     ],
     caption: 'Soft light, stillness, and long pauses.',
-    hiddenMessage: 'Long-press or hold to reveal the hidden line.'
+    hiddenMessage: 'Long-press or hold to reveal the hidden line.',
+    likesCount: 0
   },
   {
     id: 'demo-3',
@@ -32,46 +34,73 @@ const demoPosts = [
       'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80'
     ],
     caption: 'A triptych of pause, drift, and return.',
-    hiddenMessage: 'The sky keeps the poem, even when the page is silent.'
+    hiddenMessage: 'The sky keeps the poem, even when the page is silent.',
+    likesCount: 0
   }
 ]
 
 export default function App(){
   const [posts, setPosts] = useState(demoPosts)
   const [active, setActive] = useState(null)
+  const [user, setUser] = useState(null)
+  const [likedPostIds, setLikedPostIds] = useState([])
   const [showNav, setShowNav] = useState(false)
   const [showScrollHint, setShowScrollHint] = useState(true)
+  const likedSet = useMemo(() => new Set(likedPostIds), [likedPostIds])
 
   useEffect(()=>{
-    if(!isSupabaseConfigured || !supabase) {
-      setPosts(demoPosts)
-      return
-    }
-
     let cancelled = false
-    async function load(){
-      const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .order('created_at', { ascending: false })
 
-      if(cancelled) return
-      if(error){
-        console.error('Supabase fetch failed', error)
-        setPosts(demoPosts)
-        return
-      }
-      setPosts((data || []).map((row)=>({
-        id: row.id,
-        images: row.images || [],
-        caption: row.caption || '',
-        hiddenMessage: row.hidden_message || ''
-      })))
+    async function load(){
+      try{
+        const r = await fetch('/api/posts')
+        if(cancelled) return
+        if(!r.ok){ setPosts(demoPosts); return }
+        const data = await r.json()
+        setPosts((data || []).map((row)=>(
+          {
+            id: row._id || row.id,
+            images: row.images || [],
+            caption: row.caption || '',
+            hiddenMessage: row.hiddenMessage || row.hidden_message || '',
+            likesCount: row.likesCount || row.likes_count || 0
+          }
+        )))
+      }catch(err){ console.error('Posts fetch failed', err); setPosts(demoPosts) }
     }
 
     load()
     return ()=>{ cancelled = true }
   },[])
+
+  useEffect(()=>{
+    let cancelled = false
+    async function loadAuth(){
+      const result = await getAuthUser()
+      if(cancelled) return
+      setUser(result?.data?.user || null)
+    }
+    loadAuth()
+    return ()=>{ cancelled = true }
+  },[])
+
+  useEffect(()=>{
+    if(!user) { setLikedPostIds([]); return }
+    let cancelled = false
+    async function loadLikes(){
+      try{
+        const token = localStorage.getItem('rameesa_token')
+        const r = await fetch('/api/post_likes', { headers: { Authorization: `Bearer ${token}` } })
+        if(cancelled) return
+        if(!r.ok) return
+        const data = await r.json()
+        setLikedPostIds((data || []).map(row => row.post_id))
+      }catch(e){ console.error('post likes fetch failed', e) }
+    }
+
+    loadLikes()
+    return ()=>{ cancelled = true }
+  }, [user])
 
   useEffect(()=>{
     function onScroll(){
@@ -83,6 +112,46 @@ export default function App(){
     window.addEventListener('scroll', onScroll)
     return ()=>window.removeEventListener('scroll', onScroll)
   },[])
+
+  function handleLike(postId){
+    if(!isApiConfigured) return
+    if(!user) { signInWithGoogle(); return }
+    if(likedSet.has(postId)) return
+
+    let previousCount = 0
+    let nextCount = 0
+    let didUpdate = false
+
+    setPosts(prev => prev.map(p => {
+      if(p.id !== postId) return p
+      didUpdate = true
+      previousCount = p.likesCount || 0
+      nextCount = previousCount + 1
+      return { ...p, likesCount: nextCount }
+    }))
+
+    if(!didUpdate) return
+
+    setActive(prev => (prev && prev.id === postId ? { ...prev, likesCount: nextCount } : prev))
+
+    setLikedPostIds(prev => (prev.includes(postId) ? prev : [...prev, postId]))
+    (async ()=>{
+      try{
+        const token = localStorage.getItem('rameesa_token')
+        const r = await fetch(`/api/posts/${postId}/like`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({}) })
+        if(!r.ok){
+          const err = await r.json().catch(()=>({}))
+          console.error('Like failed', err)
+          // rollback
+          setPosts(prev => prev.map(p => (p.id === postId ? { ...p, likesCount: previousCount } : p)))
+          setActive(prev => (prev && prev.id === postId ? { ...prev, likesCount: previousCount } : prev))
+          setLikedPostIds(prev => prev.filter(id => id !== postId))
+        }
+      }catch(e){
+        console.error('Like request failed', e)
+      }
+    })()
+  }
 
   return (
     <div className="min-h-screen overflow-x-hidden flex flex-col">
@@ -179,7 +248,7 @@ export default function App(){
               <h3 className="mt-3 text-3xl font-light text-[#243447] font-serif">Poems as framed objects.</h3>
             </div>
           </div>
-          <GalleryGrid posts={posts} onOpen={p=>setActive(p)} />
+          <GalleryGrid posts={posts} onOpen={p=>setActive(p)} onLike={handleLike} likedPostIds={likedSet} />
         </section>
         </div>
       </main>
@@ -192,7 +261,7 @@ export default function App(){
       </footer>
 
       <AnimatePresence>
-        {active && <PostModal post={active} onClose={()=>setActive(null)} />}
+        {active && <PostModal post={active} onClose={()=>setActive(null)} onLike={handleLike} liked={likedSet.has(active.id)} />}
       </AnimatePresence>
     </div>
   )
