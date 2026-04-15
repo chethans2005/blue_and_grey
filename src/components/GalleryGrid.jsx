@@ -1,7 +1,7 @@
 import React from 'react'
 import PostCard from './PostCard'
 
-export default function GalleryGrid({posts,onOpen}){
+export default function GalleryGrid({ posts, onOpen, onLike, likedPostIds }){
   return (
     <section>
       {posts.length === 0 ? (
@@ -10,8 +10,14 @@ export default function GalleryGrid({posts,onOpen}){
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {posts.map(p=> (
-            <PostCard key={p.id} post={p} onOpen={()=>onOpen(p)} />
+          {posts.map(p => (
+            <PostCard
+              key={p.id}
+              post={p}
+              onOpen={() => onOpen(p)}
+              onLike={onLike}
+              liked={likedPostIds?.has?.(p.id)}
+            />
           ))}
         </div>
       )}

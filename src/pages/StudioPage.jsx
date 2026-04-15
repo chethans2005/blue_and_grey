@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react'
-import { supabase, isSupabaseConfigured, uploadImage, signInWithGoogle, signOut } from '../supabase'
+import { isApiConfigured, uploadImage, signInWithGoogle, signOut, getAuthUser } from '../api'
 
 const ADMIN_EMAIL = 'chetansoyal@gmail.com'
 
@@ -15,40 +15,28 @@ export default function StudioPage(){
   const [uploadError, setUploadError] = useState('')
 
   useEffect(()=>{
-    if(!supabase) return
-    supabase.auth.getUser().then(({ data })=>{
-      const current = data?.user || null
+    let cancelled = false
+    async function load(){
+      const { data } = await getAuthUser()
+      if(cancelled) return
+      const current = data?.user || data || null
       setUser(current)
       const isAdmin = current?.email === ADMIN_EMAIL
       setAdminReady(isAdmin)
-    })
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session)=>{
-      const current = session?.user || null
-      setUser(current)
-      const isAdmin = current?.email === ADMIN_EMAIL
-      setAdminReady(isAdmin)
-      if(current && !isAdmin){
-        setAuthError('This account is not allowed to access Studio.')
-        signOut()
-      } else {
-        setAuthError('')
-      }
-    })
-
-    return ()=>{
-      authListener?.subscription?.unsubscribe()
     }
+    load()
+    return ()=>{ cancelled = true }
   },[])
 
   async function ensureSignIn(){
-    if(!isSupabaseConfigured || !supabase) return false
-    const { data } = await supabase.auth.getUser()
-    if(!data?.user){
+    if(!isApiConfigured) return false
+    const { data } = await getAuthUser()
+    const userObj = data?.user || data || null
+    if(!userObj){
       await signInWithGoogle()
       return false
     }
-    const isAdmin = data.user.email === ADMIN_EMAIL
+    const isAdmin = userObj.email === ADMIN_EMAIL
     setAdminReady(isAdmin)
     if(!isAdmin){
       setAuthError('This account is not allowed to access Studio.')
@@ -85,10 +73,10 @@ export default function StudioPage(){
   }
 
   async function submit(){
-    if(!isSupabaseConfigured || !supabase) {
-      alert('Connect Supabase before using Studio')
-      return
-    }
+        if(!isApiConfigured) {
+          alert('Backend API not configured')
+          return
+        }
     if(!(await ensureSignIn())) return
     if(files.length === 0) {
       setUploadError('Please select at least one image to upload.')
@@ -111,29 +99,27 @@ export default function StudioPage(){
         })
         urls.push(url)
       }
-      const { error } = await supabase.from('posts').insert({
-        images: urls,
-        caption,
-        hidden_message: hiddenMessage
-      })
-      if(error) throw error
+      // create post via API; server accepts admin via JWT or ADMIN_SECRET header
+      const token = localStorage.getItem('rameesa_token')
+      const r = await fetch('/api/posts', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : undefined }, body: JSON.stringify({ images: urls, caption, hidden_message: hiddenMessage, likes_count: 0 }) })
+      if(!r.ok) throw new Error('post creation failed')
       setUploadProgress(100)
       setFiles([])
       setCaption('')
       setHiddenMessage('')
       alert('Uploaded')
-    }catch(err){
+        }catch(err){
       console.error(err)
-      setUploadError(err?.message || 'Upload failed. Check Supabase Storage rules and bucket configuration.')
+          setUploadError(err?.message || 'Upload failed. Check backend and storage configuration.')
     }finally{ setUploading(false) }
   }
 
   return (
     <div className="min-h-screen p-6 container-center">
       <h2 className="mb-4 text-xl text-[#243447]">Studio (hidden)</h2>
-      {!isFirebaseConfigured && (
+          {!isApiConfigured && (
         <div className="mb-4 rounded-2xl border border-slate-200 bg-white/75 px-4 py-3 text-sm text-soft backdrop-blur-sm">
-          Firebase is not configured, so Studio is read-only for now.
+             Backend client not configured. Please set up the backend to use the studio.
         </div>
       )}
       {!adminReady && (
@@ -177,7 +163,7 @@ export default function StudioPage(){
         <input value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Caption (optional)" className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400" />
         <input value={hiddenMessage} onChange={e=>setHiddenMessage(e.target.value)} placeholder="Hidden message (long-press reveal)" className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[#243447] placeholder:text-slate-400" />
         <div>
-          <button onClick={submit} disabled={uploading || !isFirebaseConfigured || !adminReady} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">{uploading? 'Uploading...' : 'Submit'}</button>
+              <button onClick={submit} disabled={uploading || !isApiConfigured || !adminReady} className="rounded-2xl bg-[#6f8aa3] px-4 py-2 text-white shadow-sm disabled:opacity-50">{uploading? 'Uploading...' : 'Submit'}</button>
         </div>
         {uploading && (
           <div className="text-xs text-soft">Uploading... {uploadProgress}%</div>
